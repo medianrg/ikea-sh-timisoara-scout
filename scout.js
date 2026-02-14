@@ -193,7 +193,7 @@ async function upsertSeenItems(items, { silent }) {
       price_text: it.price_text,   // we store it, but price change alone doesn't trigger emails
       category: it.category,
       image_url: it.image_url,
-      item_url: it.item_url,
+      item_url: it.item_url || row.item_url || null,
       last_seen_at: now,
       disappeared_at: null
     }).eq("hash", it.hash);
