@@ -83,7 +83,7 @@ async function main() {
 
     const q = await supabase
       .from("items")
-      .select("hash,title,price_text,category,image_url,first_seen_at,last_seen_at,disappeared_at")
+      .select("hash,title,price_text,category,image_url,item_url,first_seen_at,last_seen_at,disappeared_at")
       .gte("first_seen_at", startUTC)
       .lte("first_seen_at", endUTC);
 
@@ -92,7 +92,7 @@ async function main() {
     // “relisted azi” = items care au disappeared_at < startUTC și last_seen_at in today range
     const r = await supabase
       .from("items")
-      .select("hash,title,price_text,category,image_url,first_seen_at,last_seen_at,disappeared_at")
+      .select("hash,title,price_text,category,image_url,item_url,first_seen_at,last_seen_at,disappeared_at")
       .lt("disappeared_at", startUTC)
       .gte("last_seen_at", startUTC)
       .lte("last_seen_at", endUTC);
@@ -169,6 +169,7 @@ async function upsertSeenItems(items, { silent }) {
         price_text: it.price_text,
         category: it.category,
         image_url: it.image_url,
+        item_url: it.item_url,
         first_seen_at: now,
         last_seen_at: now,
         disappeared_at: null
@@ -192,6 +193,7 @@ async function upsertSeenItems(items, { silent }) {
       price_text: it.price_text,   // we store it, but price change alone doesn't trigger emails
       category: it.category,
       image_url: it.image_url,
+      item_url: it.item_url,
       last_seen_at: now,
       disappeared_at: null
     }).eq("hash", it.hash);
