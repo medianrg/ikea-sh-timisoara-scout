@@ -1,0 +1,13 @@
+{
+  "name": "ikea-sh-timisoara-scout",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "luxon": "^3.5.0",
+    "resend": "^4.0.0"
+  }
+}
