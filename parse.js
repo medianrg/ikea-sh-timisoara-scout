@@ -3,6 +3,9 @@ import * as cheerio from "cheerio";
 export function parseItemsFromHtml(html) {
   const $ = cheerio.load(html);
   const results = [];
+  let totalParsed = 0;
+  let skippedNumericTitle = 0;
+  let skippedMissingMedia = 0;
 
   // Heuristic: caută carduri cu imagine + preț (lei)
   // Dacă trebuie ajustat, aici umbli.
@@ -29,6 +32,18 @@ export function parseItemsFromHtml(html) {
 
     if (!price_text) return;
 
+    totalParsed += 1;
+
+    if (/^[0-9.,]+$/.test(title)) {
+      skippedNumericTitle += 1;
+      return;
+    }
+
+    if (!item_url && !image_url) {
+      skippedMissingMedia += 1;
+      return;
+    }
+
     results.push({ title, price_text, image_url, item_url });
   });
 
@@ -41,6 +56,10 @@ export function parseItemsFromHtml(html) {
     seen.add(key);
     deduped.push(r);
   }
+
+  console.log(
+    `Parser summary: total parsed=${totalParsed}, valid=${deduped.length}, skipped (numeric-title=${skippedNumericTitle}, missing-media=${skippedMissingMedia})`
+  );
 
   return deduped.slice(0, 200); // safety
 }
