@@ -114,12 +114,20 @@ async function main() {
 async function scrapeItems() {
   const apiKey = mustEnv("FIRECRAWL_API_KEY");
 
-  // Firecrawl scrape
-  const resp = await axios.post(
-    "https://api.firecrawl.dev/v1/scrape",
-    { url: CITY_URL, formats: ["html"] },
-    { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 60_000 }
-  );
+  let resp;
+  try {
+    // Firecrawl scrape
+    resp = await axios.post(
+      "https://api.firecrawl.dev/v1/scrape",
+      { url: CITY_URL, formats: ["html"] },
+      { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 60_000 }
+    );
+  } catch (error) {
+    if (isFirecrawlCreditsError(error)) {
+      throw new Error("FIRECRAWL_CREDITS_EXHAUSTED");
+    }
+    throw error;
+  }
 
   const html = resp?.data?.data?.html;
   if (!html) throw new Error("Firecrawl returned no HTML");
@@ -247,7 +255,22 @@ async function markDigestSent(dateRO, count) {
   await supabase.from("digests").upsert({ digest_date_ro: dateRO, item_count: count, sent_at: new Date().toISOString() });
 }
 
+function isFirecrawlCreditsError(error) {
+  if (!axios.isAxiosError(error)) return false;
+
+  const status = error.response?.status;
+  const providerError = (error.response?.data?.error || "").toLowerCase();
+
+  return status === 402 && providerError.includes("insufficient credits");
+}
+
 main().catch(async (e) => {
+  if (e?.message === "FIRECRAWL_CREDITS_EXHAUSTED") {
+    console.error("Firecrawl credits exhausted (HTTP 402). Skipping this run without failing the workflow.");
+    try { await logRun("blocked_firecrawl_credits", 0); } catch {}
+    process.exit(0);
+  }
+
   console.error(e);
   try { await logRun("error", 0); } catch {}
   process.exit(1);
