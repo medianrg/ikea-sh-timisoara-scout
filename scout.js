@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import { inferCategory } from "./categories.js";
 import { parseItemsFromHtml } from "./parse.js";
-import { sendEmail } from "./email.js";
+import { sendEmail, sendStatusEmail } from "./email.js";
 import crypto from "crypto";
 
 const MODE = (process.argv[2] || "instant").toLowerCase(); // "instant" or "daily"
@@ -11,6 +11,7 @@ const NOTIFY_MODE = (process.env.NOTIFY_MODE || "instant").toLowerCase();
 
 const CITY_URL = "https://www.ikea.com/ro/ro/circular/second-hand/#/timi%C8%99oara";
 const RELIST_AFTER_HOURS = 24;
+const FIRECRAWL_ALERT_COOLDOWN_HOURS = 12;
 
 function mustEnv(name) {
   const v = process.env[name];
@@ -255,6 +256,21 @@ async function markDigestSent(dateRO, count) {
   await supabase.from("digests").upsert({ digest_date_ro: dateRO, item_count: count, sent_at: new Date().toISOString() });
 }
 
+async function notifyOnce({ key, cooldownHours, subject, message }) {
+  const lastSentISO = await getSetting(key);
+  if (lastSentISO) {
+    const lastSent = DateTime.fromISO(lastSentISO);
+    const elapsedHours = DateTime.now().diff(lastSent, "hours").hours;
+    if (elapsedHours < cooldownHours) return;
+  }
+
+  const to = process.env.NOTIFY_EMAIL;
+  if (!to) return;
+
+  await sendStatusEmail({ to, subject, message });
+  await setSetting(key, new Date().toISOString());
+}
+
 function isFirecrawlCreditsError(error) {
   if (!axios.isAxiosError(error)) return false;
 
@@ -267,11 +283,30 @@ function isFirecrawlCreditsError(error) {
 main().catch(async (e) => {
   if (e?.message === "FIRECRAWL_CREDITS_EXHAUSTED") {
     console.error("Firecrawl credits exhausted (HTTP 402). Skipping this run without failing the workflow.");
-    try { await logRun("blocked_firecrawl_credits", 0); } catch {}
+    try {
+      await logRun("blocked_firecrawl_credits", 0);
+      await notifyOnce({
+        key: "alerts.firecrawl_credits_exhausted.last_sent_at",
+        cooldownHours: FIRECRAWL_ALERT_COOLDOWN_HOURS,
+        subject: "[IKEA SH TM] Firecrawl credits exhausted",
+        message: `Run skipped because Firecrawl returned HTTP 402 (insufficient credits).
+
+Action needed: top up Firecrawl credits or switch scraping provider.`
+      });
+    } catch {}
     process.exit(0);
   }
 
   console.error(e);
-  try { await logRun("error", 0); } catch {}
+  try {
+    await logRun("error", 0);
+    await notifyOnce({
+      key: "alerts.generic_error.last_sent_at",
+      cooldownHours: 6,
+      subject: "[IKEA SH TM] Scout run failed",
+      message: `Run failed with error:
+${String(e?.stack || e?.message || e)}`
+    });
+  } catch {}
   process.exit(1);
 });
