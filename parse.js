@@ -1,7 +1,94 @@
 import * as cheerio from "cheerio";
+import { CITY_URL } from "./config.js";
 
-export function parseItemsFromHtml(html) {
+export function parseItemsFromHtml(html, baseUrl = CITY_URL) {
   const $ = cheerio.load(html);
+  const productLists = $('ul[aria-label="Lista de produse"]');
+  if (productLists.length > 0) {
+    return parseProductCards($, productLists, baseUrl);
+  }
+
+  // Keep support for HTML returned by the original Firecrawl integration.
+  return parseLegacyItems($);
+}
+
+function parseProductCards($, productLists, baseUrl) {
+  const items = [];
+  productLists.children("li").each((index, element) => {
+    const card = $(element);
+    const heading = card.find(".typography-heading-xs").first();
+    const name = normalizeText(heading.text());
+    const description = normalizeText(heading.nextAll(".typography-body-m").first().text());
+    const fail = (reason) => {
+      throw new Error(`Invalid IKEA product card ${index + 1}${name ? ` (${name})` : ""}: ${reason}`);
+    };
+
+    if (!name || /^[\d\s.,]+$/.test(name)) fail("missing product title");
+
+    // Read the visible price parts once; .sr-text repeats the full price.
+    // Comparison prices are the original prices, not the second-hand offers.
+    const prices = card.find(".price:not(.price--comparison)").filter((_, price) =>
+      $(price).parents(".price--comparison").length === 0
+    );
+    if (prices.length < 1 || prices.length > 2) fail("missing or ambiguous current price");
+
+    const amounts = prices.toArray().map((element) => {
+      const price = $(element);
+      const integer = normalizeText(price.find(".price__integer").first().text());
+      const decimal = normalizeText(price.find(".price__decimal").first().text());
+      const currency = normalizeText(price.find(".price__currency").first().text());
+      if (!/^(?:\d+|\d{1,3}(?:[. ]\d{3})+)$/.test(integer) ||
+          !/^(?:[,.]\d{1,2})?$/.test(decimal) || currency.toLowerCase() !== "lei") {
+        fail("unrecognized current price");
+      }
+      return integer + decimal.replace(".", ",");
+    });
+
+    const image = card.find("img").first();
+    const imageSrc = image.attr("src") || image.attr("data-src");
+    if (!imageSrc) fail("missing product image");
+
+    const href = card.find("a[href]").first().attr("href");
+    if (!href && card.find("button").length === 0) fail("missing product link or group button");
+
+    let image_url;
+    let item_url;
+    try {
+      image_url = new URL(imageSrc, baseUrl).href;
+      // Groups open in place; their only real navigable URL is the city list.
+      item_url = new URL(href || baseUrl, baseUrl).href;
+    } catch {
+      fail("invalid product URL");
+    }
+
+    items.push({
+      title: [name, description].filter(Boolean).join(" "),
+      price_text: `${amounts.join(" - ")} lei`,
+      image_url,
+      item_url
+    });
+  });
+
+  const deduped = dedupeItems(items);
+  console.log(`Parser summary: product cards=${items.length}, valid=${deduped.length}`);
+  return deduped;
+}
+
+function normalizeText(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function dedupeItems(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = (item.title + "|" + item.price_text + "|" + (item.image_url || "")).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function parseLegacyItems($) {
   const results = [];
   let totalParsed = 0;
   let skippedNumericTitle = 0;
