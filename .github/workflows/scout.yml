@@ -5,6 +5,12 @@ on:
     - cron: "0 */3 * * *"
     - cron: "30 1-23/3 * * *"
   workflow_dispatch:
+    inputs:
+      check_scrape_only:
+        description: "Test Firecrawl extraction without database writes or email"
+        type: boolean
+        default: false
+
 
 jobs:
   run:
@@ -15,7 +21,14 @@ jobs:
         with:
           node-version: 24
       - run: npm install
-      - run: node scout.js
+      - name: Check Firecrawl extraction
+        if: ${{ inputs.check_scrape_only == true }}
+        run: npm run check:scrape
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      - name: Run scout
+        if: ${{ inputs.check_scrape_only != true }}
+        run: node scout.js
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

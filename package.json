@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check:scrape": "node scripts/check-scrape.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "axios": "^1.7.9",

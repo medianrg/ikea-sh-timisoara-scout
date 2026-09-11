@@ -5,11 +5,11 @@ import { inferCategory } from "./categories.js";
 import { parseItemsFromHtml } from "./parse.js";
 import { sendEmail, sendStatusEmail } from "./email.js";
 import crypto from "crypto";
+import { buildFirecrawlRequest, validateCatalogue } from "./firecrawl-request.js";
 
 const MODE = (process.argv[2] || "instant").toLowerCase(); // "instant" or "daily"
 const NOTIFY_MODE = (process.env.NOTIFY_MODE || "instant").toLowerCase();
 
-const CITY_URL = "https://www.ikea.com/ro/ro/circular/second-hand/#/timi%C8%99oara";
 const RELIST_AFTER_HOURS = 24;
 const FIRECRAWL_ALERT_COOLDOWN_HOURS = 12;
 
@@ -120,8 +120,8 @@ async function scrapeItems() {
     // Firecrawl scrape
     resp = await axios.post(
       "https://api.firecrawl.dev/v1/scrape",
-      { url: CITY_URL, formats: ["html"] },
-      { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 60_000 }
+      buildFirecrawlRequest(),
+      { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 90_000 }
     );
   } catch (error) {
     if (isFirecrawlCreditsError(error)) {
@@ -130,8 +130,10 @@ async function scrapeItems() {
     throw error;
   }
 
-  const html = resp?.data?.data?.html;
+  const html = resp?.data?.data?.rawHtml;
   if (!html) throw new Error("Firecrawl returned no HTML");
+  const cardCount = validateCatalogue(html);
+  console.log(`IKEA Timișoara: complete catalogue (${cardCount} cards)`);
 
   const rawItems = parseItemsFromHtml(html).map(it => ({
     ...it,
@@ -140,6 +142,7 @@ async function scrapeItems() {
   }));
 
   console.log(`Parsed items: ${rawItems.length}`);
+  if (rawItems.length === 0) throw new Error("IKEA parser returned no products; item state was not updated");
   return rawItems;
 }
 
