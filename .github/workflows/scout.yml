@@ -10,6 +10,10 @@ on:
         description: "Test Firecrawl extraction without database writes or email"
         type: boolean
         default: false
+      preview_email:
+        description: "Send a 4-product email preview without database writes"
+        type: boolean
+        default: false
 
 
 jobs:
@@ -21,13 +25,25 @@ jobs:
         with:
           node-version: 24
       - run: npm install
+      - name: Validate manual options
+        if: ${{ inputs.check_scrape_only == true && inputs.preview_email == true }}
+        run: |
+          echo "Choose either check_scrape_only or preview_email."
+          exit 1
       - name: Check Firecrawl extraction
         if: ${{ inputs.check_scrape_only == true }}
         run: npm run check:scrape
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+      - name: Send email preview
+        if: ${{ inputs.preview_email == true }}
+        run: node scripts/preview-email-live.js
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
       - name: Run scout
-        if: ${{ inputs.check_scrape_only != true }}
+        if: ${{ inputs.check_scrape_only != true && inputs.preview_email != true }}
         run: node scout.js
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
