@@ -107,7 +107,12 @@ async function main() {
       return;
     }
 
-    await sendDailyEmail(nowRO.toISODate(), merged);
+    // Original prices are display-only data from this scrape; no schema/hash changes.
+    const currentByHash = new Map(items.map(item => [item.hash, item]));
+    const emailItems = merged.map(item => ({
+      ...item, original_price_text: currentByHash.get(item.hash)?.original_price_text
+    }));
+    await sendDailyEmail(nowRO.toISODate(), emailItems);
     await markDigestSent(nowRO.toISODate(), merged.length);
   }
 }
@@ -223,7 +228,7 @@ async function sendInstantEmail(items) {
     to: mustEnv("NOTIFY_EMAIL"),
     subject,
     items,
-    modeLabel: "Instant (30 min)"
+    modeLabel: "Produse noi și relistate"
   });
 }
 

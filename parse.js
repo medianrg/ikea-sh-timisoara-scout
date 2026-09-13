@@ -33,16 +33,18 @@ function parseProductCards($, productLists, baseUrl) {
     if (prices.length < 1 || prices.length > 2) fail("missing or ambiguous current price");
 
     const amounts = prices.toArray().map((element) => {
-      const price = $(element);
-      const integer = normalizeText(price.find(".price__integer").first().text());
-      const decimal = normalizeText(price.find(".price__decimal").first().text());
-      const currency = normalizeText(price.find(".price__currency").first().text());
-      if (!/^(?:\d+|\d{1,3}(?:[. ]\d{3})+)$/.test(integer) ||
-          !/^(?:[,.]\d{1,2})?$/.test(decimal) || currency.toLowerCase() !== "lei") {
-        fail("unrecognized current price");
-      }
-      return integer + decimal.replace(".", ",");
+      const amount = readPriceAmount($, element);
+      if (amount === null) fail("unrecognized current price");
+      return amount;
     });
+
+    // Original prices are optional display data and must not change offer identity.
+    const comparisonAmounts = card.find(".price.price--comparison").toArray()
+      .map((element) => readPriceAmount($, element));
+    const original_price_text = comparisonAmounts.length >= 1 && comparisonAmounts.length <= 2 &&
+      comparisonAmounts.every((amount) => amount !== null)
+      ? `${comparisonAmounts.join(" - ")} lei`
+      : null;
 
     const image = card.find("img").first();
     const imageSrc = image.attr("src") || image.attr("data-src");
@@ -64,6 +66,7 @@ function parseProductCards($, productLists, baseUrl) {
     items.push({
       title: [name, description].filter(Boolean).join(" "),
       price_text: `${amounts.join(" - ")} lei`,
+      ...(original_price_text ? { original_price_text } : {}),
       image_url,
       item_url
     });
@@ -72,6 +75,18 @@ function parseProductCards($, productLists, baseUrl) {
   const deduped = dedupeItems(items);
   console.log(`Parser summary: product cards=${items.length}, valid=${deduped.length}`);
   return deduped;
+}
+
+function readPriceAmount($, element) {
+  const price = $(element);
+  const integer = normalizeText(price.find(".price__integer").first().text());
+  const decimal = normalizeText(price.find(".price__decimal").first().text());
+  const currency = normalizeText(price.find(".price__currency").first().text());
+  if (!/^(?:\d+|\d{1,3}(?:[. ]\d{3})+)$/.test(integer) ||
+      !/^(?:[,.]\d{1,2})?$/.test(decimal) || currency.toLowerCase() !== "lei") {
+    return null;
+  }
+  return integer + decimal.replace(".", ",");
 }
 
 function normalizeText(value) {

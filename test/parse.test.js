@@ -33,6 +33,7 @@ test("current IKEA card preserves decimal offer price and resolves the product h
   assert.deepEqual(items, [{
     title: "VECKLARFLY Perdea, alb, 145x300 cm",
     price_text: "139,60 lei",
+    original_price_text: "349 lei",
     image_url: "https://www.ikea.com/ro/ro/images/products/vecklarfly.jpg",
     item_url: new URL("#/timi%C8%99oara/878247186", CITY_URL).href
   }]);
@@ -47,6 +48,7 @@ test("group cards preserve the full current price range and link to the city lis
   })));
   assert.equal(items[0].title, "KALLAX Etajeră, alb");
   assert.equal(items[0].price_text, "199,50 - 239,40 lei");
+  assert.equal(items[0].original_price_text, "399 lei");
   assert.equal(items[0].item_url, CITY_URL);
 });
 
@@ -56,7 +58,35 @@ test("relative image URLs and whole or thousands-separated prices are supported"
     prices: price("1.249")
   })));
   assert.equal(items[0].price_text, "1.249 lei");
+  assert.equal(items[0].original_price_text, undefined);
   assert.equal(items[0].image_url, "https://www.ikea.com/ro/ro/images/products/sofa.jpg");
+});
+
+test("original prices preserve decimals and ranges separately from current offers", () => {
+  const [item] = parseItemsFromHtml(productList(card({
+    group: true,
+    prices: price("1.249", ".90", true) + " - " + price("1 499", ",50", true) + price("999", ",60")
+  })));
+  assert.equal(item.original_price_text, "1.249,90 - 1 499,50 lei");
+  assert.equal(item.price_text, "999,60 lei");
+});
+
+test("missing or unreadable optional original prices do not reject valid offers", () => {
+  for (const comparison of ["", price("349", ",broken", true), price("", "", true)]) {
+    const [item] = parseItemsFromHtml(productList(card({ prices: comparison + price("139", ",60") })));
+    assert.equal(item.price_text, "139,60 lei");
+    assert.equal(item.original_price_text, undefined);
+  }
+});
+
+test("adding or changing original prices leaves hash fields and deduplication unchanged", () => {
+  const identity = ({ title, price_text, image_url }) => ({ title, price_text, image_url });
+  const withoutOriginal = parseItemsFromHtml(productList(card({ prices: price("139", ",60") })))[0];
+  const withOriginal = parseItemsFromHtml(productList(card()))[0];
+  const changedOriginal = card({ prices: price("499", "", true) + price("139", ",60") });
+  assert.deepEqual(identity(withOriginal), identity(withoutOriginal));
+  assert.deepEqual(identity(parseItemsFromHtml(productList(changedOriginal))[0]), identity(withoutOriginal));
+  assert.equal(parseItemsFromHtml(productList(card() + changedOriginal)).length, 1);
 });
 
 test("an incomplete modern card rejects the scrape instead of losing that item silently", () => {
