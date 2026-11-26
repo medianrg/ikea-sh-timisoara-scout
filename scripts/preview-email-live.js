@@ -1,5 +1,5 @@
 import axios from "axios";
-import { buildFirecrawlRequest, validateCatalogue } from "../firecrawl-request.js";
+import { FIRECRAWL_SCRAPE_URL, buildFirecrawlRequest, validateCatalogue } from "../firecrawl-request.js";
 import { parseItemsFromHtml } from "../parse.js";
 import { inferCategory } from "../categories.js";
 import { sendEmail } from "../email.js";
@@ -9,7 +9,7 @@ try {
   for (const name of ["FIRECRAWL_API_KEY", "RESEND_API_KEY", "NOTIFY_EMAIL"]) {
     if (!process.env[name]) throw new Error(`Missing env: ${name}`);
   }
-  const response = await axios.post("https://api.firecrawl.dev/v1/scrape", buildFirecrawlRequest(), {
+  const response = await axios.post(FIRECRAWL_SCRAPE_URL, buildFirecrawlRequest(), {
     headers: { Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}` }, timeout: 90_000
   });
   const html = response.data?.data?.rawHtml;

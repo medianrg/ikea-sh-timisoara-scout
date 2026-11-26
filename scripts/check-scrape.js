@@ -1,12 +1,12 @@
 import axios from "axios";
-import { buildFirecrawlRequest, validateCatalogue } from "../firecrawl-request.js";
+import { FIRECRAWL_SCRAPE_URL, buildFirecrawlRequest, validateCatalogue } from "../firecrawl-request.js";
 import { parseItemsFromHtml } from "../parse.js";
 
 // A live Firecrawl check without Supabase writes or email delivery.
 try {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) throw new Error("Missing env: FIRECRAWL_API_KEY");
-  const response = await axios.post("https://api.firecrawl.dev/v1/scrape", buildFirecrawlRequest(), {
+  const response = await axios.post(FIRECRAWL_SCRAPE_URL, buildFirecrawlRequest(), {
     headers: { Authorization: `Bearer ${apiKey}` }, timeout: 90_000
   });
   const html = response.data?.data?.rawHtml;

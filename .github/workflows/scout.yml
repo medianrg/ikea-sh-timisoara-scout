@@ -1,9 +1,11 @@
 name: IKEA SH TM
 
 on:
-  schedule:
-    - cron: "0 */3 * * *"
-    - cron: "30 1-23/3 * * *"
+  # Automatic runs paused for IKEA Black Friday until 2026-11-30.
+  # Restore this schedule after confirming the regular catalogue is back.
+  # schedule:
+  #   - cron: "0 */3 * * *"
+  #   - cron: "30 1-23/3 * * *"
   workflow_dispatch:
     inputs:
       check_scrape_only:
