@@ -5,7 +5,7 @@ import { inferCategory } from "./categories.js";
 import { parseItemsFromHtml } from "./parse.js";
 import { sendEmail, sendStatusEmail } from "./email.js";
 import crypto from "crypto";
-import { buildFirecrawlRequest, validateCatalogue } from "./firecrawl-request.js";
+import { FIRECRAWL_SCRAPE_URL, buildFirecrawlRequest, validateCatalogue } from "./firecrawl-request.js";
 
 const MODE = (process.argv[2] || "instant").toLowerCase(); // "instant" or "daily"
 const NOTIFY_MODE = (process.env.NOTIFY_MODE || "instant").toLowerCase();
@@ -124,7 +124,7 @@ async function scrapeItems() {
   try {
     // Firecrawl scrape
     resp = await axios.post(
-      "https://api.firecrawl.dev/v1/scrape",
+      FIRECRAWL_SCRAPE_URL,
       buildFirecrawlRequest(),
       { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 90_000 }
     );

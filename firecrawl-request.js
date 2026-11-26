@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 import { CITY_URL } from "./config.js";
 
+export const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v2/scrape";
+
 // Firecrawl executes these clicks in its rendered browser before capturing HTML.
 // Bound the work; validation below rejects a catalogue that still has more pages.
 const LOAD_MORE_SCRIPT = `(() => {
